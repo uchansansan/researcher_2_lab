@@ -1,5 +1,11 @@
 from math import sin, cos, pi
+from random import choice
 
+movements = {
+    1: 'l',
+    2: 'f',
+    3: 'r'
+}
 
 class DuckAI:
     # input: data = ((x, y), angle)
@@ -46,22 +52,30 @@ class DuckAI:
                                            and y + self.crossroad['title'] > cross.pos[1],
                              self.points))
         if len(points) > 0:
+            #ji
             pass
-            # has the point on this pos
         else:
             type = data[1][0]
             slicer = (self.angle + data[0]) // 90 + 2
+
             point = CrossRoad(self, (type, (x, y), slicer))
             self.points.append(point)
             for j, el in enumerate(point.type):
-                print(el)
                 if el == 0:
                     continue
-                road = Road(self, [point.id], False if j != (slicer+2) % 4 else True)
+                road = Road(self, [point], False if j != (slicer+2) % 4 else True)
                 point.set_road(road, j)
-                self.lines = road
-                print(road.points, road.used)
-            print(point.type)
+                self.lines.append(road)
+            line = choice(list(filter(lambda a: isinstance(a, Road) and not a.used, point.type)))
+            line.used = True
+            move = (point.type.index(line) + slicer - 3) % 4
+            self.nowCrossRoad = point
+            if self.nowRoad:
+                self.nowRoad.points.add(point)
+            self.nowRoad = line
+            print(move)
+
+            # (control callback(move))
 
 
 class CrossRoad:
@@ -82,16 +96,16 @@ class CrossRoad:
 
 
 class Road:
-    # input: duck_bot=DuckAI child, points=(int)//ids of cross roads
+    # input: duck_bot=DuckAI child, points=()//cross roads
     def __init__(self, duck_bot, points, used=False):
         self.id = len(duck_bot.points)
         self.points = points
         self.used = used
 
 
-duck = DuckAI(((1, 1), 89))
+duck = DuckAI(((1, 1), 180))
 
 for i in range(5):
-    duck.tick((0.1, 0))
+    duck.tick((0, 0))
 
-duck.cross_road([1, ['1', '10']])
+duck.cross_road([1, ['1', '9']])
