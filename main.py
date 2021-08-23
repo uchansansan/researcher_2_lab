@@ -35,16 +35,17 @@ class DuckAI:
         self.pos['y'] += y
 
     # input: data=[offsetAngle, [str]]
-    def cross_road(self, data=[]):
+    def cross_road(self, data=[0, []]):
         data[1].remove('1')
         x, y = self.__offset(self.angle + data[0], self.crossroad['title'] + self.crossroad['msrl'])
         x += self.pos['x']
         y += self.pos['y']
-        points = list(filter(lambda cross: x - self.crossroad['title'] < cross.pos[0]
-                                           and x + self.crossroad['title'] > cross.pos[0]
-                                           and y - self.crossroad['title'] < cross.pos[1]
-                                           and y + self.crossroad['title'] > cross.pos[1],
-                             self.points))
+
+        slicer = (self.angle + data[0]) // 90 + 2
+        points = list(filter(lambda cross: x - self.crossroad['title'] < cross.pos[0] and x + self.crossroad['title'] > cross.pos[0] and y - self.crossroad['title'] < cross.pos[1] and y + self.crossroad['title'] > cross.pos[1], self.points))
+
+        line = None
+
         if len(points) > 0:
             print(len(points))
             point = points[0]
@@ -52,27 +53,23 @@ class DuckAI:
                 self.nowRoad.points.append(point)
             self.nowCrossRoad = point
 
-            line = None
-
-            lines = list(filter(lambda a: not a.used,point.lines))
+            lines = list(filter(lambda a: not a.used, point.lines))
             if len(lines) == 0:
                 next_point = None
 
                 neighbours = self.__neighbour_points(point)
-                for i in neighbours:
-                    if len(list((lambda a: not a.used,i.lines))) > 0:
-                        next_point = i
+                for j in neighbours:
+                    if len(list((lambda a: not a.used, j.lines))) > 0:
+                        next_point = j
                         break
-
+                line = list(filter(lambda a: a != 0 and point in a.points, next_point.type))[0]
             else:
                 line = choice(list(filter(lambda a: isinstance(a, Road) and not a.used and a != self.nowRoad, point.type)))
-
         else:
-            type = data[1][0]
-            slicer = (self.angle + data[0]) // 90 + 2
+            type_in = data[1][0]
             now = slicer - (2*int(not slicer % 2))
 
-            point = CrossRoad(self, (type, (x, y), slicer))
+            point = CrossRoad(self, (type_in, (x, y), slicer))
             if self.nowRoad:
                 self.nowRoad.points.append(point)
             self.points.append(point)
@@ -88,31 +85,33 @@ class DuckAI:
                 self.lines.append(road)
 
             line = choice(list(filter(lambda a: isinstance(a, Road) and not a.used, point.type)))
-            line.used = True
-            move = (point.type.index(line) + slicer - 3) % 4
-            self.nowCrossRoad = point
-            self.nowRoad = line
 
-            # (control callback(move))
+        line.used = True
+        move = (point.type.index(line) + slicer - 3) % 4
+        self.nowCrossRoad = point
+        self.nowRoad = line
+        # (control callback(move))
+
     def __neighbour_points(self, point):
         points = []
-        for i, el in enumerate(point.type):
+        for el in point.type:
             if el == 0:
                 continue
             elif len(el.points) > 1:
-                points.append(list(filter(lambda a: a!=point,el.points))[0])
+                points.append(list(filter(lambda a: a != point, el.points))[0])
         return points
+
 
 class CrossRoad:
     # input: duck_bot=DuckAI child, data=(cross type, (x, y), slicer))
     def __init__(self, duck_bot, data):
         # l, f, r, b
-        type = {'8': [1, 1, 1, 1],
-                '11': [1, 0, 1, 1],
-                '9': [0, 1, 1, 1],
-                '10': [1, 1, 0, 1]
-                }
-        self.type = type[data[0]][:data[-1]] + type[data[0]][data[-1]:]
+        type_crossroad = {'8': [1, 1, 1, 1],
+                          '11': [1, 0, 1, 1],
+                          '9': [0, 1, 1, 1],
+                          '10': [1, 1, 0, 1]
+                          }
+        self.type = type_crossroad[data[0]][:data[-1]] + type_crossroad[data[0]][data[-1]:]
         self.pos = data[1]
         self.id = len(duck_bot.points)
 
@@ -126,6 +125,7 @@ class Road:
         self.id = len(duck_bot.points)
         self.points = points
         self.used = used
+
 
 # tests
 duck = DuckAI(((1, 1), 180))
