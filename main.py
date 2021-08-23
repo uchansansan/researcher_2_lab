@@ -44,10 +44,14 @@ class DuckAI:
         slicer = (self.angle + data[0]) // 90 + 2
         points = list(filter(lambda cross: x - self.crossroad['title'] < cross.pos[0] and x + self.crossroad['title'] > cross.pos[0] and y - self.crossroad['title'] < cross.pos[1] and y + self.crossroad['title'] > cross.pos[1], self.points))
 
+
         line = None
 
-        if len(points) > 0:
-            print(len(points))
+        if len(self.points) > 0 and (self.lines) == len(list(filter(lambda l: len(l.points)==2, self.lines))):
+            point = points[0]
+            line = choice(list(filter(lambda a: isinstance(a, Road) and a != self.nowRoad, point.type)))
+
+        elif len(points) > 0:
             point = points[0]
             if not (point in self.nowRoad.points):
                 self.nowRoad.points.append(point)
@@ -91,6 +95,7 @@ class DuckAI:
         self.nowCrossRoad = point
         self.nowRoad = line
         # (control callback(move))
+        # send data to gui
 
     def __neighbour_points(self, point):
         points = []
