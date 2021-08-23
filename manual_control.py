@@ -32,29 +32,12 @@ class VideoDetection:
 
     def scan_lines(self, img):
         mask = self.split_mask(self.sdelat_krasivo(cv.inRange(img, self.red_high, self.red_low)))
-        msk = np.zeros((self.y, self.x))[::, ::] + mask
+        # msk = mask + np.zeros((self.y, self.x))[self.diff_y:, self.diff_x:-self.diff_x]
+        
         edges = cv.Canny(mask, 50, 150)
-        lines = cv.HoughLinesP(edges, 1, np.pi/180, 30, minLineLength=50, maxLineGap=150,)
+        lines = cv.HoughLinesP(edges, 1, np.pi/180, 30, minLineLength=50, maxLineGap=150)
         return lines
 
-    def split_mask(self, mask):
-        self.y,self.x = mask.shape
-        self.diff_y, self.diff_x = self.y-round(self.y/1.6), self.x-round(self.x/5) 
-        msk = mask[:round(self.y/1.6):, :round(self.x/5):]
-        msk = msk[::, :-round(self.x/5):]
-
-        return msk
-        
-
-        # zeros = np.zeros((round(len(mask)/1.6), len(mask[0])))
-        # zeros_borders = np.zeros((len(mask), round(len(mask[0])/6)))
-        # mask[:round(len(mask)/1.6):] = zeros
-        # mask[:len(mask):][:round(len(mask[0])/6):] = zeros_borders
-        # mask[:len(mask):][:-round(len(mask[0])/6):] = zeros_borders
-
-
-        cv.imshow("mask", mask)
-        return mask
 
     def scan_code(self, frame):
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
@@ -62,6 +45,16 @@ class VideoDetection:
         parameters =  aruco.DetectorParameters_create()
         corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
         return corners, ids
+
+    def split_mask(self, mask):
+        y,x = mask.shape
+        diff_y, diff_x = round(y/1.4), round(x/7) 
+        self.y, self.x, self.diff_x, self.diff_y = y,x, diff_x, diff_y
+
+        cropped_mask = mask.copy()[ diff_y:, diff_x:-diff_x]
+        # cv.imshow("mask", cropped_mask)
+        
+        return cropped_mask
 
     def sdelat_krasivo(self, mask):
         er = cv.erode(mask, core, iterations=2)
@@ -83,7 +76,8 @@ class VideoDetection:
                         frame_markers = aruco.drawDetectedMarkers(img.copy(), corners, ids)
                     for line in lines:
                         x1,y1,x2,y2 = line[0]
-                        cv.line(frame_markers,(x1,y1),(x2,y2),(0,255,0),2)
+                        cv.line(frame_markers,(x1+self.diff_x,y1+self.diff_y),(x2+self.diff_x,y2+self.diff_y),(0,255,0),2)
+        cv.rectangle(frame_markers, (self.x-self.diff_x, self.y ), (self.diff_x,self.diff_y),(255,0,0), thickness=2)
         return ids, frame_markers
 
 parser = argparse.ArgumentParser()
