@@ -77,7 +77,6 @@ class DuckAI:
             type_in = data[0]
             print(type_in)
             now = slicer - (2*int(not slicer % 2))
-
             point = CrossRoad(self, (type_in, (x, y)), slicer)
             if self.nowRoad:
                 self.nowRoad.points.append(point)
@@ -96,7 +95,8 @@ class DuckAI:
             line = choice(list(filter(lambda a: isinstance(a, Road) and not a.used, point.type)))
 
         line.used = True
-        move = (point.type.index(line) + slicer - 3) % 4
+        move = (point.type.index(line) + slicer + 1) % 4
+        print('debug in move', point.type.index(line), move, self.angle)
         self.nowCrossRoad = point
         self.nowRoad = line
         return move

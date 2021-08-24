@@ -232,9 +232,9 @@ def update(dt):
     dist  = lane_pose.dist
     angle = lane_pose.angle_rad
 
-    action = regulator(angle, dist)
+    # action = regulator(angle, dist)
     if env.step_count > 3:
-        builder.tick(action)
+        builder.tick(np.array([0.0, 0.0]))
         builder.debug([[env.cur_pos[0],env.cur_pos[2]],env.cur_angle*180/np.pi])
 
 
@@ -246,12 +246,17 @@ def update(dt):
     obs, reward, done, info = env.step(action)
     obs = cv.cvtColor(obs, cv.COLOR_BGR2RGB)
 
-    ids, frame =  detect.scan(obs, env.step_count)
+    ids, frame = detect.scan(obs, env.step_count)
+    move = None
     if ids is not None:
-        print(builder.cross_road(ids[0]))
+        move = builder.cross_road(ids[0])
+    if move in [0, 1, 2, 3]:
+        action = regulator(angle, dist, move)
+    else:
+        action = regulator(angle, dist)
 
 
-    cv.imshow("game", frame)
+    # cv.imshow("game", frame)
 
 
     if done:
