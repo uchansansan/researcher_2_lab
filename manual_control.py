@@ -9,64 +9,64 @@ import numpy as np
 from cv2 import aruco
 import time
 
-
-core = np.ones([3,3])
-
-
 class VideoDetection:
     def __init__(self, visualization=False):
-        self.SQUARE_BOUND = 3000
-        self.DELAY = 200
-        self.RED_LOW = np.array([150, 150, 255])
-        self.RED_HIGH = np.array([13, 16, 153])
-        self.vizualization = visualization 
-        self.is_scanned = False
-        self.timer = 0
+        self._SQUARE_BOUND = 3000
+        self._DELAY = 50
+        self._RED_LOW = np.array([150, 150, 255])
+        self._RED_HIGH = np.array([13, 16, 153])
+        self._VIZUALIZATION = visualization 
 
+        self._is_scanned = False
+        self._timer = 0
+
+        self._core = np.ones([3,3])
 
     def scan(self, img, tick):
-
         frame_markers = img
         ids = None
         lines = self._scan_lines(img)
 
-        if(self.is_scanned and tick-self.timer >= self.DELAY):
-            self.is_scanned = False
-            self.timer = tick
+        if self._is_scanned and tick-self._timer >= self._DELAY:
+            self._is_scanned = False
+            self._timer = tick
             return ids, frame_markers
             
-        
-        if(lines is not None and len(lines) >= 2): 
+        if lines is not None and len(lines) >= 2: 
             corners, ids = self._scan_code(img)
             square = self._GaussSquare(corners)
 
-            if(square  < self.SQUARE_BOUND):
+            if square  < self._SQUARE_BOUND:
                 ids = None
 
-            if(self.is_scanned):
+            if self._is_scanned:
                 ids = None
                 
-            if(ids is not None):
-                if(not self.is_scanned):
-                    self.timer = tick
-                    self.is_scanned = True
-                if(self.vizualization):
-                    frame_markers = aruco.drawDetectedMarkers(img.copy(), corners, ids)
-                    cv.putText(frame_markers, str(square), (10,10), cv.FONT_HERSHEY_PLAIN, 1, (0,0,0))
+            if ids is not None:
+                if not self._is_scanned:
+                    self._timer = tick
+                    self._is_scanned = True
 
-            if (self.vizualization):
-                for line in lines:
-                    x1,y1,x2,y2 = line[0]
-                    cv.line(frame_markers,(x1+self.diff_x,y1+self.diff_y),(x2+self.diff_x,y2+self.diff_y),(0,255,0),2)
+            if self._VIZUALIZATION:
+                if ids is not None:
+                    frame_markers = self._draw_code_box(corners, ids, frame_markers)
+                frame_markers = self._draw_lines(lines, frame_markers)
+
         cv.rectangle(frame_markers, (self.x-self.diff_x, self.y ), (self.diff_x,self.diff_y),(255,0,0), thickness=2)
         return ids, frame_markers
 
-    def _draw_lines(self, lines):
-        pass
-    def _draw_box(self, corners):
-        pass
+    def _draw_lines(self, lines, image):
+        for line in lines:
+            x1,y1,x2,y2 = line[0]
+            cv.line(image,(x1+self.diff_x,y1+self.diff_y),(x2+self.diff_x,y2+self.diff_y),(0,255,0),2)
+        return image
+
+    def _draw_code_box(self, corners, ids, image):
+        frame_markers = aruco.drawDetectedMarkers(image.copy(), corners, ids)
+        return frame_markers
+
     def _scan_lines(self, img):
-        mask = self._split_mask(self._sdelat_krasivo(cv.inRange(img, self.RED_HIGH, self.RED_LOW)))
+        mask = self._split_mask(self._sdelat_krasivo(cv.inRange(img, self._RED_HIGH, self._RED_LOW)))
         edges = cv.Canny(mask, 50, 150)
         lines = cv.HoughLinesP(edges, 1, np.pi/180, 30, minLineLength=50, maxLineGap=150)
         return lines
@@ -80,9 +80,9 @@ class VideoDetection:
 
     def _GaussSquare(self, vertex):
         right, left, res = 0,0,0
-        if (vertex != []):
+        if vertex != []:
             for i in range(len(vertex[0][0])):
-                if(i+1 < len(vertex[0][0])):
+                if i+1 < len(vertex[0][0]):
                     right += vertex[0][0][i][0] * vertex[0][0][i+1][1]
                     left += vertex[0][0][i][1] * vertex[0][0][i+1][0]
             res = right - left
@@ -96,10 +96,9 @@ class VideoDetection:
         return cropped_mask
 
     def _sdelat_krasivo(self, mask):
-        er = cv.erode(mask, core, iterations=2)
-        dil = cv.dilate(er, core, iterations=4)
+        er = cv.erode(mask, self._core, iterations=2)
+        dil = cv.dilate(er, self._core, iterations=4)
         return dil
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--env-name", default=None)
@@ -135,11 +134,6 @@ env.render()
 
 @env.unwrapped.window.event
 def on_key_press(symbol, modifiers):
-    """
-    This handler processes keyboard commands that
-    control the simulation
-    """
-
     if symbol == key.BACKSPACE or symbol == key.SLASH:
         print("RESET")
         env.reset()
@@ -156,6 +150,57 @@ detect = VideoDetection(visualization=True)
 key_handler = key.KeyStateHandler()
 env.unwrapped.window.push_handlers(key_handler)
 
+def regulator(w,r):
+    kp = 1
+    kRot= 1
+    k_lin = 1/2
+    k_ang = 4.7
+    V0 = 0.45
+
+    V_L = V0 + kp * r+ kRot*w
+    V_R = V0 - kp * r- kRot*w
+
+    V_LIN = k_lin * (V_L + V_R)
+    V_ANG = k_ang * (V_L - V_R)
+    return np.array([V_LIN, V_ANG])
+
+MAXTICKS = 50
+current_ticks = MAXTICKS
+left  = False
+right = False
+up    = False
+
+def naprav(ukaz):
+    global  left, right, up
+    if ukaz == 0:
+        left = True
+        return np.array([0,1])
+    elif ukaz == 1:
+        right = True
+        return np.array([1,0])
+    elif ukaz == 2:
+        up = True
+        return np.array([0,-1])
+
+def ezda(*args):
+    global left, right, up, current_ticks
+    if left or right or up:
+        current_ticks -= 1
+        if current_ticks < 1:
+            left, right, up = False, False, False
+            current_ticks = MAXTICKS
+    if left:
+        return naprav(0)
+    elif right:
+        return naprav(2)
+    elif up:
+        return naprav(1)
+    elif len(args)==2:
+        return regulator(args[0], args[1])
+    else:
+        return naprav(args[2])
+
+Manual = False
 
 
 def update(dt):
@@ -163,33 +208,40 @@ def update(dt):
     This function is called at every frame to handle
     movement/stepping and redrawing
     """
+    global Manual
     wheel_distance = 0.102
     min_rad = 0.08
 
     action = np.array([0.0, 0.0])
+    if not Manual:
+        lane_pose = env.get_lane_pos2(env.cur_pos, env.cur_angle)
+        dist  = lane_pose.dist
+        angle = lane_pose.angle_rad
 
-    if key_handler[key.UP]:
-        action += np.array([0.44, 0.0])
-    if key_handler[key.DOWN]:
-        action -= np.array([0.44, 0])
-    if key_handler[key.LEFT]:
-        action += np.array([0, 1])
-    if key_handler[key.RIGHT]:
-        action -= np.array([0, 1])
-    if key_handler[key.SPACE]:
-        action = np.array([0, 0])
+        action = regulator(angle, dist )
+    else:
+        if key_handler[key.UP]:
+            action += np.array([0.44, 0.0])
+        if key_handler[key.DOWN]:
+            action -= np.array([0.44, 0])
+        if key_handler[key.LEFT]:
+            action += np.array([0, 1])
+        if key_handler[key.RIGHT]:
+            action -= np.array([0, 1])
+        if key_handler[key.SPACE]:
+            action = np.array([0, 0])
 
-    v1 = action[0]
-    v2 = action[1]
-    # Limit radius of curvature
-    if v1 == 0 or abs(v2 / v1) > (min_rad + wheel_distance / 2.0) / (min_rad - wheel_distance / 2.0):
-        # adjust velocities evenly such that condition is fulfilled
-        delta_v = (v2 - v1) / 2 - wheel_distance / (4 * min_rad) * (v1 + v2)
-        v1 += delta_v
-        v2 -= delta_v
-    # env.unwrapped.step_count
-    action[0] = v1
-    action[1] = v2
+        v1 = action[0]
+        v2 = action[1]
+        # Limit radius of curvature
+        if v1 == 0 or abs(v2 / v1) > (min_rad + wheel_distance / 2.0) / (min_rad - wheel_distance / 2.0):
+            # adjust velocities evenly such that condition is fulfilled
+            delta_v = (v2 - v1) / 2 - wheel_distance / (4 * min_rad) * (v1 + v2)
+            v1 += delta_v
+            v2 -= delta_v
+        # env.unwrapped.step_count
+        action[0] = v1
+        action[1] = v2
 
     # Speed boost
     if key_handler[key.LSHIFT]:
@@ -201,11 +253,6 @@ def update(dt):
     ids, frame =  detect.scan(obs, env.unwrapped.step_count)
 
     cv.imshow("game", frame)
-    if(ids is not None):
-        print(ids)
-
-
-
 
     if done:
         print("done!")
@@ -214,10 +261,8 @@ def update(dt):
 
     env.render()
 
-
 pyglet.clock.schedule_interval(update, 1.0 / env.unwrapped.frame_rate)
 
 # Enter main event loop
 pyglet.app.run()
-
 env.close()
