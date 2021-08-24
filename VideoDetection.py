@@ -2,18 +2,17 @@ import numpy as np
 import cv2 as cv
 from cv2 import aruco
 
-core = np.ones([3,3])
 
 class VideoDetection:
     def __init__(self, visualization=False):
         self._SQUARE_BOUND = 3000
         self._DELAY = 50
-        self.__RED_LOW = np.array([150, 150, 255])
+        self._RED_LOW = np.array([150, 150, 255])
         self._RED_HIGH = np.array([13, 16, 153])
         self._VIZUALIZATION = visualization 
 
         self._is_scanned = False
-        self.__timer = 0
+        self._timer = 0
 
         self._core = np.ones([3,3])
 
@@ -22,9 +21,9 @@ class VideoDetection:
         ids = None
         lines = self._scan_lines(img)
 
-        if self._is_scanned and tick-self.__timer >= self._DELAY:
+        if self._is_scanned and tick-self._timer >= self._DELAY:
             self._is_scanned = False
-            self.__timer = tick
+            self._timer = tick
             return ids, frame_markers
             
         if lines is not None and len(lines) >= 2: 
@@ -39,7 +38,7 @@ class VideoDetection:
                 
             if ids is not None:
                 if not self._is_scanned:
-                    self.__timer = tick
+                    self._timer = tick
                     self._is_scanned = True
 
             if self._VIZUALIZATION:
@@ -61,7 +60,7 @@ class VideoDetection:
         return frame_markers
 
     def _scan_lines(self, img):
-        mask = self._split_mask(self._sdelat_krasivo(cv.inRange(img, self._RED_HIGH, self.__RED_LOW)))
+        mask = self._split_mask(self._sdelat_krasivo(cv.inRange(img, self._RED_HIGH, self._RED_LOW)))
         edges = cv.Canny(mask, 50, 150)
         lines = cv.HoughLinesP(edges, 1, np.pi/180, 30, minLineLength=50, maxLineGap=150)
         return lines
